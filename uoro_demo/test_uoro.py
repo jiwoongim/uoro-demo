@@ -5,14 +5,14 @@ from argparse import Namespace
 from artemis.general.ezprofile import EZProfiler
 from artemis.ml.tools.processors import RunningAverage
 from artemis.plotting.easy_plotting import funplot
-from recurrent_problems.datasets.anbn import get_an_bn_prediction_dataset
-from recurrent_problems.datasets.synthetic_rnn_data import generate_synthetic_rnn_data
-from spiking_experiments.farnn.recurrent_learners.predictor_funcs import StatelessPredictorRNN
-from spiking_experiments.farnn.recurrent_learners.rtrl import RTRL
-from spiking_experiments.farnn.recurrent_learners.uoro import UOROVec
-from spiking_experiments.farnn.recurrent_learners._uoro_deprecated import UORO_Deprecated
-from spiking_experiments.farnn.torch_utils.torch_helpers import torch_str
-from spiking_experiments.farnn.torch_utils.training import get_named_torch_optimizer_factory, \
+from anbn import get_an_bn_prediction_dataset
+from synthetic_rnn_data import generate_synthetic_rnn_data
+from predictor_funcs import StatelessPredictorRNN
+from uoro_demo.rtrl import RTRL
+from uoro_demo.uoro import UOROVec
+from uoro_demo._uoro_deprecated import UORO_Deprecated
+from torch_utils.torch_helpers import torch_str
+from torch_utils.training import get_named_torch_optimizer_factory, \
     numpy_struct_to_torch_struct, torch_loop, train_online_network
 
 

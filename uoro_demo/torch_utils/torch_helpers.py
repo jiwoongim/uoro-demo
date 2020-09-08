@@ -119,12 +119,12 @@ def magically_torchify_everything():
         parent_namespace[k] = numpified_namespace[k]
 
 
-def torch_loop(func, *args):
+def torch_loop(func, is_cuda, *args):
 
     n_steps = len(args[0])
     assert all(len(a) == n_steps for a in args[1:]), 'All arguments should have the same first dimension, which represents the number of steps.  Actual shapes are: {}'.format([a.size() for a in args])
-
-    first_out = func(*(a[0] for a in args))
+        
+    first_out = func(*(a[0] for a in args), is_cuda=is_cuda)
     if first_out is None:
         for i in range(1, n_steps):
             func(*(a[i] for a in args))
@@ -133,5 +133,7 @@ def torch_loop(func, *args):
         out_tensor = torch.autograd.Variable(torch.zeros(n_steps, *first_out.size()))
         out_tensor[0] = first_out
         for i in range(1, n_steps):
-            out_tensor[i] = func(*(a[i] for a in args))
+            out_tensor[i] = func(*(a[i] for a in args), is_cuda=is_cuda)
         return out_tensor
+
+

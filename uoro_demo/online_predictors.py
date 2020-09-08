@@ -18,7 +18,7 @@ class OnlinePredictorTypes:
 OPT = OnlinePredictorTypes
 
 
-def get_online_predictor(n_in, n_hid, n_out, predictor_type, loss, optimizer, learning_rate, predictor_options = {}, rnn_type ='GRUPredictor', rnn_options = {}):
+def get_online_predictor(n_in, n_hid, n_out, predictor_type, loss, optimizer, learning_rate, predictor_options = {}, rnn_type ='GRUPredictor', rnn_options = {}, is_cuda=False):
     """
     Get a trainable predictor.
 
@@ -40,7 +40,7 @@ def get_online_predictor(n_in, n_hid, n_out, predictor_type, loss, optimizer, le
     else:
         assert issubclass(rnn_type, torch.nn.Module)
 
-    forward_module = rnn_type(n_in=n_in, n_hid=n_hid, n_out=n_out, **rnn_options)
+    forward_module = rnn_type(n_in=n_in, n_hid=n_hid, n_out=n_out, is_cuda=is_cuda, **rnn_options)
 
     predictor_class = {
         OPT.UORO: UOROVec,
@@ -49,7 +49,10 @@ def get_online_predictor(n_in, n_hid, n_out, predictor_type, loss, optimizer, le
 
     return predictor_class(
         forward_update_module = forward_module,
-        loss=loss,
+        loss=loss, 
+        is_cuda=is_cuda,
         optimizer_factory=get_named_torch_optimizer_factory(optimizer, learning_rate),
         **predictor_options
         )
+
+

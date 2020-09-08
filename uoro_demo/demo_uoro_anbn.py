@@ -113,6 +113,7 @@ def demo_anbn_prediction(
         loss='xe',
         alpha = 3e-2,
         seed=1234,
+        is_cuda=False
         ):
     """
     :param n_training_steps:
@@ -138,27 +139,30 @@ def demo_anbn_prediction(
     torch.manual_seed(seed)
     random.seed(seed)
 
-    if is_test_mode():
-        n_training_steps=10
+    #n_training_steps=10
+    n_test_steps=10
 
     predictor_options = predictor_options.copy()
     if alpha is not None:
         predictor_options['learning_rate_generator'] = (learning_rate/(1.+alpha*np.sqrt(t)) for t in itertools.count(0))
 
-    x_train, y_train = get_an_bn_prediction_dataset(n_training_steps=n_training_steps, n_test_steps=None, k=k, l=l, onehot_inputs=True, onehot_target=False)
+    #x_train, y_train = get_an_bn_prediction_dataset(n_training_steps=n_training_steps, n_test_steps=None, k=k, l=l, onehot_inputs=True, onehot_target=False)
+    x_train, y_train, x_test, y_test = get_an_bn_prediction_dataset(n_training_steps=n_training_steps, n_test_steps=n_test_steps, k=k, l=l, onehot_inputs=True, onehot_target=False)
     n_in = n_out = 3
 
     net = get_online_predictor(n_in=n_in, n_hid=n_hid, n_out=n_out, predictor_type=predictor_type, rnn_type=rnn_type, rnn_options=rnn_options, loss=loss,
-                               optimizer=optimizer, learning_rate=learning_rate, predictor_options=predictor_options,
+                               optimizer=optimizer, learning_rate=learning_rate, predictor_options=predictor_options, is_cuda=is_cuda
                                )
 
     for result in train_online_network_checkpoints(
             model = net,
-            dataset = (x_train, y_train),
+            dataset = (x_train, y_train, x_test, y_test),
             n_tests= n_splits,
             error_func=error_func,
+            is_cuda=is_cuda,
             batchify=True,
             test_online=True,
+            offline_test_mode='cold_test',
             online_test_reporter = 'recent',
             checkpoint_generator=('exp', 1000, 0.1)
             ):
@@ -180,7 +184,15 @@ for XX in [X1, X2, X3, X4]:
 
 if __name__ == '__main__':
 
+    if torch.cuda.is_available():  
+        dev = "cuda:0" 
+    else:  
+        dev = "cpu"  
+
     demo_anbn_prediction.browse(display_format='flat', filterexp='has:insane', filterrec = 'result@last')
     # You can run both experiments in parallel with 'run all -p'
     # Later, when records have been saved, you can view results with 'compare all'
     # You can also just run demo_anbn_prediction() alone if you don't want to bother with saving results.
+
+
+

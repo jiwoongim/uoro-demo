@@ -16,7 +16,7 @@ class UOROVec(TrainableStatefulModule):
     """
 
     def __init__(self, forward_update_module, loss = 'mse', optimizer_factory = get_named_torch_optimizer_factory('sgd', 0.01),
-                 epsilon_perturbation = 1e-7, epsilon_stability = 1e-7, learning_rate_generator = None,
+                 epsilon_perturbation = 1e-7, epsilon_stability = 1e-7, learning_rate_generator = None, is_cuda=False,
                  ):
         """
         :param forward_update_module: a RecurrentStatelessModule whose forward function has the form
@@ -44,18 +44,24 @@ class UOROVec(TrainableStatefulModule):
     def _initialize_state(self, x):
         self._state = self.forward_update_module.get_initial_state(x)
 
-    def forward(self, x):
+    def forward(self, x, is_cuda=0):
 
         if self._state is None:
             self._initialize_state(x)
+
+        if is_cuda:
+            self._state = self._state.cuda()
 
         out, self._state = self.forward_update_module(x, nested_map(lambda x: x.detach(), self._state))
+
         return out
 
-    def train_it(self, x, y):
+    def train_it(self, x, y, is_cuda=0):
 
         if self._state is None:
-            self._initialize_state(x)
+            self._initialize_state(x)        
+        if is_cuda: self._state = self._state.cuda()
+
         state_vec_old = MergedVariable.join(self._state, requires_grad=True, as_leaf=True)
         out, state_new = self.forward_update_module(x, state_vec_old.cleave())
         state_vec_new = MergedVariable.join(state_new)
@@ -66,6 +72,10 @@ class UOROVec(TrainableStatefulModule):
             self.s_toupee = Variable(torch.zeros(*state_vec_old.size()))  # (batch_size, state_dim)
             self.theta_toupee = Variable(torch.zeros(*self.theta.size()))  # (n_params, )
 
+        if is_cuda: 
+            self.s_toupee = self.s_toupee.cuda()
+            self.theta_toupee = self.theta_toupee.cuda()
+
         indirect_grad = (dl_dstate_old*self.s_toupee).sum()*self.theta_toupee
         pseudograds = indirect_grad + dl_dtheta_direct  # (n_params, )
 
@@ -75,6 +85,7 @@ class UOROVec(TrainableStatefulModule):
         state_deriv_in_direction_s_toupee = (state_vec_new_perturbed - state_vec_new)/self.epsilon_perturbation
 
         nus = Variable(torch.round(torch.rand(*state_vec_old.size()))*2-1)
+        if is_cuda: nus = nus.cuda()
 
         # Backprop nus through the rnn
         direct_theta_toupee_contribution, = grad(outputs=state_vec_new, inputs=self.theta, grad_outputs=nus)
@@ -97,3 +108,5 @@ class UOROVec(TrainableStatefulModule):
     def set_state(self, state):
         theta, self._state, self.s_toupee, self.theta_toupee = state
         self.theta.data[:] = theta.data
+
+

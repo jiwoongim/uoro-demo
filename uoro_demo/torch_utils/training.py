@@ -79,7 +79,9 @@ def get_named_torch_optimizer_factory(name, learning_rate):
         }[name.lower()], lr=learning_rate)
 
 
-def train_online_network_checkpoints(model, dataset, checkpoint_generator = None, test_online=True, return_output = True, n_tests=0, offline_test_mode=None, online_test_reporter ='recent', error_func ='mse', batchify = False, print_every = 5):
+def train_online_network_checkpoints(model, dataset, checkpoint_generator = None, \
+            test_online=True, return_output = True, n_tests=0, offline_test_mode=None, is_cuda=False, \
+            online_test_reporter ='recent', error_func ='mse', batchify = False, print_every = 5):
     """
 
     :param model: A TrainableStatefulModule
@@ -88,6 +90,7 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
     :return: train_test_errors: A tuple of (time_step, train_error, test_error)
     """
     data = numpy_struct_to_torch_struct(dataset, cast_floats='float32')
+
     if batchify:
         data = [x[:, None] for x in data]
     if len(data)==4:
@@ -99,6 +102,13 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
         raise Exception('Expected data to be (x_train, y_train, x_test, y_test) or (x_test, y_test)')
     assert len(y_train) == len(x_train)
     assert len(x_test) == len(y_test)
+    if is_cuda:
+        x_train = x_train.cuda()
+        y_train = y_train.cuda()
+        x_test = x_test.cuda()
+        y_test = y_test.cuda()
+
+
 
     if isinstance(checkpoint_generator, tuple):
         distribution = checkpoint_generator[0]
@@ -120,9 +130,7 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
     initial_state = model.get_state()
 
     # results = SequentialStructBuilder()
-
     results = Duck()
-
     if test_online:
         loss_accumulator = RunningAverage() if online_test_reporter=='cum' else RecentRunningAverage() if online_test_reporter=='recent' else lambda x: x if online_test_reporter is None else bad_value(online_test_reporter)
 
@@ -143,8 +151,8 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
                     y_middle_guess = torch_loop(model, x_train[t:None])
                 y_test_guess = torch_loop(model, x_test)
 
-                train_err = error_func(_flatten_first_2(y_train_guess), _flatten_first_2(y_train[:t])).data.numpy()[0] if y_train_guess is not None else np.nan
-                test_err = error_func(_flatten_first_2(y_test_guess), _flatten_first_2(y_test)).data.numpy()[0]
+                train_err = error_func(_flatten_first_2(y_train_guess), _flatten_first_2(y_train[:t])).data.numpy() if y_train_guess is not None else np.nan
+                test_err = error_func(_flatten_first_2(y_test_guess), _flatten_first_2(y_test)).data.numpy()
 
                 # train_err, test_err = tuple((y_guess - y_truth).abs().sum().data.numpy() for y_guess, y_truth in [(y_train_guess, y_train[:t] if t>0 else torch.zeros(2, 2, 2)/0), (y_test_guess, y_test)])
                 print('Iteration {} of {}: Training: {:.3g}, Test: {:.3g}'.format(t, len(x_train), train_err, test_err))
@@ -154,8 +162,13 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
                 # results['offline_errors']['test'].next = test_err
 
             elif offline_test_mode == 'cold_test':
-                y_test_guess = torch_loop(model, x_test)
-                test_err = error_func(_flatten_first_2(y_test_guess), _flatten_first_2(y_test)).data.numpy()[0]
+                y_test_guess = torch_loop(model, is_cuda, x_test)
+                y_test_guess = _flatten_first_2(y_test_guess)
+                if is_cuda:
+                    y_test_guess = y_test_guess.cuda()
+                    test_err = error_func(y_test_guess, _flatten_first_2(y_test)).data.cpu().numpy()
+                else:
+                    test_err = error_func(y_test_guess, _flatten_first_2(y_test)).data.numpy()
                 print('Iteration {} of {}: Test: {:.3g}'.format(t, len(x_train), test_err))
                 results['offline_errors', next, :] = dict(t=t, test=test_err)
                 # results['offline_errors']['t'].next = t
@@ -163,11 +176,17 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
             else:
                 raise Exception('No test_mode: {}'.format(offline_test_mode))
             model.set_state(training_state)
-
+   
         if t<n_training_samples:
-            out = model.train_it(x_train[t], y_train[t])
+            #model.set_state(initial_state)
+            #training_state = model.get_state()
+            #model.set_state(training_state)
+            out = model.train_it(x_train[t], y_train[t], is_cuda)
             if return_output:
-                results['output', next] = out.data.numpy()[0]
+                if is_cuda: 
+                    results['output', next] = out.data.cpu().numpy()[0]
+                else:
+                    results['output', next] = out.data.numpy()[0]
             if test_online:
                 # print 'Out: {}, Correct: {}'.format(np.argmax(out.data.numpy(), axis=1), torch_str(y_train[t]))
                 this_loss = error_func(out, y_train[t]).item()

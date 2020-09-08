@@ -14,7 +14,7 @@ class RTRL(TrainableStatefulModule):
     """
 
     def __init__(self, forward_update_module, loss = 'mse', optimizer_factory = get_named_torch_optimizer_factory('sgd', 0.01),
-                 learning_rate_generator = None):
+                 learning_rate_generator = None, is_cuda=False):
         """
         :param forward_update_module: a RecurrentStatelessModule whose forward function has the form
             output, state = forward_update_module(input, state)
@@ -37,18 +37,31 @@ class RTRL(TrainableStatefulModule):
     def _initialize_state(self, x):
         self.state = self.forward_update_module.get_initial_state(x)
 
-    def forward(self, x):
+    def forward(self, x, is_cuda=0):
         if self.state is None:
             self._initialize_state(x)
+
+        if is_cuda:
+            self.state = self.state.cuda()
+
         out, self.state = self.forward_update_module(x, nested_map(lambda x: x.detach(), self.state))
         return out
 
-    def train_it(self, x, y):
+    def train_it(self, x, y, is_cuda=0):
+
         if self.state is None:
             self._initialize_state(x)
+
+        if is_cuda:
+            self.state = self.state.cuda()
+
         state_vec_old = MergedVariable.join(self.state, requires_grad=True, as_leaf=True)
         if self.dstate_dtheta is None:
             self.dstate_dtheta = Variable(torch.zeros(len(state_vec_old), len(self.theta)))
+
+        if is_cuda:
+            self.dstate_dtheta = self.dstate_dtheta.cuda()
+
         out, state_new = self.forward_update_module(x, state_vec_old.cleave())
         loss = self.loss_function(out, y)
 
@@ -72,4 +85,6 @@ class RTRL(TrainableStatefulModule):
         return clone_em((self.theta, self.state, self.dstate_dtheta))
 
     def set_state(self, state):
-        self.theta, self.state, self.dstate_dtheta = state
+        theta, self.state, self.dstate_dtheta = state
+        self.theta.data[:] = theta.data
+

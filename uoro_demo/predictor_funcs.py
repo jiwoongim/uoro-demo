@@ -62,7 +62,7 @@ class StatelessPredictorRNN(RecurrentStatelessModule):
 
 class GRUPredictor(RecurrentStatelessModule):
 
-    def __init__(self, n_in, n_hid, n_out, bias = True):
+    def __init__(self, n_in, n_hid, n_out, bias = True, is_cuda=False):
         super(GRUPredictor, self).__init__()
         self.n_hid = n_hid
         self.f_xz = Linear(n_in, n_hid, bias=bias)
@@ -73,7 +73,18 @@ class GRUPredictor(RecurrentStatelessModule):
         self.f_hrh = Linear(n_hid, n_hid, bias=False)
         self.f_hy = Linear(n_hid, n_out, bias=bias)
 
+        if is_cuda:
+            self.f_xz = self.f_xz.cuda() 
+            self.f_xr = self.f_xr.cuda() 
+            self.f_xh = self.f_xh.cuda() 
+            self.f_hz = self.f_hz.cuda() 
+            self.f_hr = self.f_hr.cuda() 
+            self.f_hrh= self.f_hrh.cuda()
+            self.f_hy = self.f_hy.cuda() 
+
+
     def forward(self, x, h_old):
+
         z = sigmoid(self.f_xz(x) + self.f_hz(h_old))
         r = sigmoid(self.f_xr(x) + self.f_hr(h_old))
         h = z * h_old + (1-z)* tanh(self.f_xh(x) + self.f_hrh(r*h_old))
@@ -82,3 +93,5 @@ class GRUPredictor(RecurrentStatelessModule):
 
     def get_initial_state(self, x_init):
         return torch.autograd.Variable(torch.zeros(len(x_init), self.n_hid), requires_grad=True)
+
+
