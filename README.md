@@ -1,5 +1,5 @@
 
-# uoro-demo (Works with GPU)
+# uoro-demo (works on GPU)
 
 A PyTorch implementation of [Unbiased Online Recurrent Optimization](https://arxiv.org/abs/1702.05043); Corentin Tallec, Yann Ollivier.
 
