@@ -19,7 +19,8 @@ source setup.sh
 Or to be able to import this code in an existing Python environment, go:
 
 ```
-pip install -e git+https://github.com/petered/uoro-demo.git#egg=uoro-demo
+git clone https://github.com/petered/artemis
+python install -e .
 ```
 
 You'll need the artemis dependency to be checked out on branch ("peter") for now.
