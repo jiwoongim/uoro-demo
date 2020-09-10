@@ -1,5 +1,5 @@
 
-# uoro-demo
+# uoro-demo (works on GPU)
 
 A PyTorch implementation of [Unbiased Online Recurrent Optimization](https://arxiv.org/abs/1702.05043); Corentin Tallec, Yann Ollivier.
 
@@ -15,12 +15,6 @@ cd uoro-demo
 source setup.sh
 ```
 (You'll be prompted to setup pytorch manually depending on your system).
-
-Or to be able to import this code in an existing Python environment, go:
-
-```
-pip install -e git+https://github.com/petered/uoro-demo.git#egg=uoro-demo
-```
 
 You'll need the artemis dependency to be checked out on branch ("peter") for now.
 
