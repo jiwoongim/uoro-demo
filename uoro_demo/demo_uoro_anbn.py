@@ -47,6 +47,7 @@ def show_this_record(record, scale='normal'):
 
     n_training_steps = result['checkpoints', -1, 'iter'] if 'checkpoints' in result else args['n_training_steps']
 
+    import pdb; pdb.set_trace()
     data = get_an_bn_prediction_dataset(n_training_steps=n_training_steps, n_test_steps=args['n_training_steps'], k=args['k'], l=args['l'], onehot_inputs=True, onehot_target=False)
     y_train = data[1]
     print('Prediction: '+ str(np.argmax(result['output', -100:], axis=1)).replace('\n', ''))
@@ -139,8 +140,8 @@ def demo_anbn_prediction(
     torch.manual_seed(seed)
     random.seed(seed)
 
-    #n_training_steps=10
-    n_test_steps=10
+    n_training_steps=10000000
+    n_test_steps=10000
 
     predictor_options = predictor_options.copy()
     if alpha is not None:
@@ -162,13 +163,13 @@ def demo_anbn_prediction(
             is_cuda=is_cuda,
             batchify=True,
             test_online=True,
+            print_every=200,
             offline_test_mode='cold_test',
             online_test_reporter = 'recent',
             checkpoint_generator=('exp', 1000, 0.1)
             ):
         print('Yielding Result at {} iterations.'.format(result['checkpoints', -1, 'iter']))
         yield result
-
 
 X1 = demo_anbn_prediction.add_root_variant('easy', k=4, l=4, n_training_steps=10000)
 X2 = demo_anbn_prediction.add_root_variant('medium', k=1, l=4, n_training_steps=40000)

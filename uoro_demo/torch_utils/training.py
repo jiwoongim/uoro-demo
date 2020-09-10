@@ -93,6 +93,7 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
 
     if batchify:
         data = [x[:, None] for x in data]
+
     if len(data)==4:
         x_train, y_train, x_test, y_test = data
     elif len(data)==2:
@@ -146,13 +147,20 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
             model.set_state(initial_state)
 
             if offline_test_mode == 'full_pass':
-                y_train_guess = torch_loop(model, x_train[:t]) if t > 0 else None
+                y_train_guess = torch_loop(model, is_cuda, x_train[:t]) if t > 0 else None
                 if t<len(x_train)-1:
-                    y_middle_guess = torch_loop(model, x_train[t:None])
-                y_test_guess = torch_loop(model, x_test)
-
-                train_err = error_func(_flatten_first_2(y_train_guess), _flatten_first_2(y_train[:t])).data.numpy() if y_train_guess is not None else np.nan
-                test_err = error_func(_flatten_first_2(y_test_guess), _flatten_first_2(y_test)).data.numpy()
+                    y_middle_guess = torch_loop(model, is_cuda, x_train[t:None])
+                y_test_guess = torch_loop(model, is_cuda, x_test)
+                if is_cuda:
+                    y_train_guess = y_test_guess.cuda()
+                    y_test_guess = y_test_guess.cuda()
+    
+                if is_cuda:
+                    train_err = error_func(_flatten_first_2(y_train_guess), _flatten_first_2(y_train[:t])).data.cpu().numpy() if y_train_guess is not None else np.nan
+                    test_err = error_func(_flatten_first_2(y_test_guess), _flatten_first_2(y_test)).data.cpu().numpy()
+                else:
+                    train_err = error_func(_flatten_first_2(y_train_guess), _flatten_first_2(y_train[:t])).data.numpy() if y_train_guess is not None else np.nan
+                    test_err = error_func(_flatten_first_2(y_test_guess), _flatten_first_2(y_test)).data.numpy()
 
                 # train_err, test_err = tuple((y_guess - y_truth).abs().sum().data.numpy() for y_guess, y_truth in [(y_train_guess, y_train[:t] if t>0 else torch.zeros(2, 2, 2)/0), (y_test_guess, y_test)])
                 print('Iteration {} of {}: Training: {:.3g}, Test: {:.3g}'.format(t, len(x_train), train_err, test_err))
@@ -169,6 +177,7 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
                     test_err = error_func(y_test_guess, _flatten_first_2(y_test)).data.cpu().numpy()
                 else:
                     test_err = error_func(y_test_guess, _flatten_first_2(y_test)).data.numpy()
+    
                 print('Iteration {} of {}: Test: {:.3g}'.format(t, len(x_train), test_err))
                 results['offline_errors', next, :] = dict(t=t, test=test_err)
                 # results['offline_errors']['t'].next = t
@@ -203,7 +212,8 @@ def train_online_network_checkpoints(model, dataset, checkpoint_generator = None
             yield results
             next_checkpoint = next(checkpoint_generator)
             # yield nested_map(lambda x: np.array(x), results, is_container_func=lambda x: isinstance(x, dict))
-
+    
+    import pdb; pdb.set_trace()
     # yield results.to_structseq(as_arrays=True)
     # yield nested_map(lambda x: np.array(x), results, is_container_func=lambda x: isinstance(x, dict))
 
@@ -406,3 +416,5 @@ class SequentialStructBuilder(object):
     def to_seqstruct(self):
         structs = self.to_struct()
         return nested_map(lambda s: seqstruct_to_structseq(s) if isinstance(s, dict) else s, structs, is_container_func = lambda x: isinstance(x, list))
+
+
